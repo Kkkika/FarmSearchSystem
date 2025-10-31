@@ -149,10 +149,3 @@
 - 消费者系统：`http://localhost:8082`
 - 企业系统：`http://localhost:8083`
 
-## 许可证
-
-[MIT License](https://opensource.org/licenses/MIT)
-
-## 联系方式
-
-如有问题或建议，请联系项目维护团队。
