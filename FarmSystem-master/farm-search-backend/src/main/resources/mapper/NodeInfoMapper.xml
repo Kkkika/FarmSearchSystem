@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gala.farmsearchbackend.mapper.NodeInfoMapper">
+
+    <resultMap id="BaseResultMap" type="com.gala.farmsearchbackend.model.domain.NodeInfo">
+            <id property="nodeId" column="node_id" jdbcType="INTEGER"/>
+            <result property="code" column="code" jdbcType="VARCHAR"/>
+            <result property="password" column="password" jdbcType="VARCHAR"/>
+            <result property="name" column="name" jdbcType="VARCHAR"/>
+            <result property="type" column="type" jdbcType="INTEGER"/>
+            <result property="provId" column="prov_id" jdbcType="INTEGER"/>
+            <result property="cityId" column="city_id" jdbcType="INTEGER"/>
+            <result property="address" column="address" jdbcType="VARCHAR"/>
+            <result property="businessId" column="business_id" jdbcType="VARCHAR"/>
+            <result property="epId" column="ep_id" jdbcType="VARCHAR"/>
+            <result property="eiaId" column="eia_id" jdbcType="VARCHAR"/>
+            <result property="cirId" column="cir_id" jdbcType="VARCHAR"/>
+            <result property="fbId" column="fb_id" jdbcType="VARCHAR"/>
+            <result property="corporation" column="corporation" jdbcType="VARCHAR"/>
+            <result property="telephone" column="telephone" jdbcType="VARCHAR"/>
+            <result property="regDate" column="reg_date" jdbcType="DATE"/>
+            <result property="remarks" column="remarks" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        node_id,code,password,
+        name,type,prov_id,
+        city_id,address,business_id,
+        ep_id,eia_id,cir_id,
+        fb_id,corporation,telephone,
+        reg_date,remarks,status
+    </sql>
+
+    <!-- 根据登录编码和密码查询 -->
+    <select id="getNodeInfoByCodeByPass" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM node_info
+        WHERE code = #{code} AND password = #{password}
+    </select>
+
+    <!-- 获取节点企业总数 -->
+    <select id="getNodeInfoCount" resultType="int">
+        SELECT COUNT(*) FROM node_info WHERE status = 0
+    </select>
+
+    <!-- 按省份统计 - 只统计正常状态的企业 -->
+    <select id="listNodeInfoDataByProv" resultType="com.gala.farmsearchbackend.model.dto.nodeDto.NodeInfoTotalByProvDto">
+        SELECT
+            p.prov_id,
+            p.prov_name,
+            COUNT(n.node_id) as total
+        FROM province p
+                 LEFT JOIN node_info n ON p.prov_id = n.prov_id AND n.status = 0
+        GROUP BY p.prov_id, p.prov_name
+        ORDER BY total DESC
+    </select>
+
+    <!-- 按类型统计 - 只统计正常状态的企业 -->
+    <select id="listNodeInfoDataByType" resultType="com.gala.farmsearchbackend.model.dto.nodeDto.NodeInfoTotalByTypeDto">
+        SELECT
+            type,
+            COUNT(node_id) as total
+        FROM node_info
+        WHERE status = 0
+        GROUP BY type
+        ORDER BY type
+    </select>
+
+    <!-- 按月统计 - 只统计正常状态的企业 -->
+    <select id="listNodeInfoDataByMonth" resultType="com.gala.farmsearchbackend.model.dto.nodeDto.NodeInfoTotalByMonthDto">
+        SELECT
+            DATE_FORMAT(reg_date, '%Y-%m') as month,
+            COUNT(node_id) as total
+        FROM node_info
+        WHERE status = 0
+        GROUP BY DATE_FORMAT(reg_date, '%Y-%m')
+        ORDER BY month DESC
+    </select>
+
+    <select id="selectNodeInfoDetailById" resultType="com.gala.farmsearchbackend.model.dto.nodeDto.NodeInfoDetailsDto">
+        SELECT
+            ni.node_id,
+            ni.code,
+            ni.name,
+            CASE ni.type
+                WHEN 1 THEN '养殖企业'
+                WHEN 2 THEN '屠宰企业'
+                WHEN 3 THEN '批发商'
+                WHEN 4 THEN '零售商'
+                ELSE '未知类型'
+                END as type,
+            p.prov_name as province,
+            c.city_name as city,
+            ni.address,
+            ni.business_id,
+            ni.ep_id,
+            ni.eia_id,
+            ni.cir_id,
+            ni.fb_id,
+            ni.corporation,
+            ni.telephone,
+            ni.reg_date
+        FROM node_info ni
+                 LEFT JOIN province p ON ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON ni.city_id = c.city_id
+        WHERE ni.node_id = #{nodeId}
+    </select>
+</mapper>

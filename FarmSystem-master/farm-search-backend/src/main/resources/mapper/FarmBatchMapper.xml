@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gala.farmsearchbackend.mapper.FarmBatchMapper">
+
+    <resultMap id="BaseResultMap" type="com.gala.farmsearchbackend.model.domain.FarmBatch">
+            <id property="fbId" column="fb_id" jdbcType="INTEGER"/>
+            <result property="batchId" column="batch_id" jdbcType="VARCHAR"/>
+            <result property="farmId" column="farm_id" jdbcType="INTEGER"/>
+            <result property="type" column="type" jdbcType="VARCHAR"/>
+            <result property="agcId" column="agc_id" jdbcType="VARCHAR"/>
+            <result property="testName" column="test_name" jdbcType="VARCHAR"/>
+            <result property="batchDate" column="batch_date" jdbcType="DATE"/>
+            <result property="state" column="state" jdbcType="INTEGER"/>
+            <result property="remarks" column="remarks" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        fb_id,batch_id,farm_id,
+        type,agc_id,test_name,
+        batch_date,state,remarks
+    </sql>
+
+    <select id="selectFarmBatchSimpleById"
+            resultType="com.gala.farmsearchbackend.model.dto.farmDto.FarmSimpleDto">
+        SELECT
+            fb.batch_id,
+            p.prov_name as province,
+            c.city_name as city,
+            fb.type,
+            fb.agc_id,
+            fb.test_name
+        FROM farm_batch fb
+                 LEFT JOIN node_info ni ON fb.farm_id = ni.node_id
+                 LEFT JOIN province p ON ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON ni.city_id = c.city_id
+        WHERE fb.fb_id = #{fbId}
+    </select>
+
+    <select id="selectFarmDetailById" resultType="com.gala.farmsearchbackend.model.dto.farmDto.FarmDetailsDto">
+        SELECT
+            fb.batch_id,
+            ni.name as nodeName,
+            fb.type,
+            fb.agc_id,
+            fb.test_name,
+            DATE_FORMAT(fb.batch_date, '%Y-%m-%d') as batchDate,
+            CASE fb.state
+                WHEN 1 THEN '待发布'
+                WHEN 2 THEN '已发布'
+                WHEN 3 THEN '已下架'
+                ELSE '未知'
+                END as state
+        FROM farm_batch fb
+                 LEFT JOIN node_info ni ON fb.farm_id = ni.node_id
+        WHERE fb.fb_id = #{fbId}
+    </select>
+
+    <select id="selectFarmBatchByState" resultType="com.gala.farmsearchbackend.model.dto.farmDto.FarmStateDto">
+        SELECT
+        fb_id as fbId,
+        batch_id as batchId,
+        type,
+        batch_date as batchDate,
+        state
+        FROM farm_batch
+        WHERE farm_id = #{queryDto.farmId}
+        AND state != 3  <!-- 排除已下架状态 -->
+        <if test="queryDto.state != null">
+            AND state = #{queryDto.state}
+        </if>
+        ORDER BY batch_date DESC
+    </select>
+
+    <select id="selectDownstreamSlaughterhouseNames" resultType="java.lang.String">
+        SELECT DISTINCT ni.name
+        FROM slau_batch sb
+                 INNER JOIN node_info ni ON sb.slau_id = ni.node_id
+        WHERE sb.fb_id IN (
+            SELECT fb_id FROM farm_batch WHERE farm_id = #{farmId}
+        )
+          AND ni.status = 0
+    </select>
+</mapper>

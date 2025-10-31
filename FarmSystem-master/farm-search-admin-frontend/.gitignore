@@ -1,0 +1,64 @@
+# 依赖目录
+# 通常通过包管理器（如 npm, yarn, pnpm）重新安装，体积庞大，不应纳入版本控制
+node_modules/
+.pnp.js
+.pnp.loader.js
+
+# 构建和打包产物
+# 这些文件是项目构建后生成的，应在每次部署时重新生成
+dist/
+build/
+out/
+.next/
+.nuxt/
+
+# 日志文件
+# 日志文件通常包含本地环境的调试信息，对其他开发者无用
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 环境变量文件
+# 这类文件通常包含敏感信息，如 API 密钥、数据库密码等，非常重要，绝不能提交！
+# 建议在项目中维护一个 .env.example 文件作为模板
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 缓存文件
+.npm/
+.yarn-cache/
+.cache/
+
+# 操作系统和编辑器生成的文件
+# 这些是特定于开发者个人环境的文件，与其他项目成员无关
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+._*
+
+# 编辑器配置
+# VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+
+# JetBrains (WebStorm, IntelliJ IDEA, etc.)
+.idea/
+
+# 其他
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

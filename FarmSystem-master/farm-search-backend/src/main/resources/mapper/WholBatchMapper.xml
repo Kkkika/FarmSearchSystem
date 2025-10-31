@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gala.farmsearchbackend.mapper.WholBatchMapper">
+
+    <resultMap id="BaseResultMap" type="com.gala.farmsearchbackend.model.domain.WholBatch">
+        <id property="wbId" column="wb_id" jdbcType="INTEGER"/>
+        <result property="batchId" column="batch_id" jdbcType="VARCHAR"/>
+        <result property="wholId" column="whol_id" jdbcType="INTEGER"/>
+        <result property="sbId" column="sb_id" jdbcType="INTEGER"/>
+        <result property="type" column="type" jdbcType="VARCHAR"/>
+        <result property="batchDate" column="batch_date" jdbcType="DATE"/>
+        <result property="state" column="state" jdbcType="INTEGER"/>
+        <result property="remarks" column="remarks" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        wb_id, batch_id, whol_id, sb_id, type, batch_date, state, remarks
+    </sql>
+
+    <!-- 更新批发商产品批号状态 -->
+    <update id="updateWholBatchState">
+        UPDATE whol_batch
+        SET state = #{state}, remarks = #{remarks}
+        WHERE wb_id = #{wbId}
+    </update>
+
+    <!-- 根据批发商产品批号ID查询详情 -->
+    <select id="selectWholBatchDetailById" parameterType="java.lang.Integer" resultType="com.gala.farmsearchbackend.model.dto.wholDto.WholBatchDetailDto">
+        SELECT
+            wb.batch_id,
+            p.prov_name as slau_province,
+            c.city_name as slau_city,
+            slau_ni.name as slau_name,
+            sb.batch_id as slau_batch_id,
+            sb.type as slau_product_type,
+            wb.type
+        FROM whol_batch wb
+                 LEFT JOIN slau_batch sb ON wb.sb_id = sb.sb_id
+                 LEFT JOIN node_info slau_ni ON sb.slau_id = slau_ni.node_id
+                 LEFT JOIN province p ON slau_ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON slau_ni.city_id = c.city_id
+        WHERE wb.wb_id = #{wbId}
+    </select>
+
+    <select id="selectWholDetailById" resultType="com.gala.farmsearchbackend.model.dto.wholDto.WholDetailsDto">
+        SELECT
+            wb.batch_id,
+            ni.name as nodeName,
+            p.prov_name as nodeProvince,
+            c.city_name as nodeCity,
+            sb.batch_id as slauBatchId,
+            wb.type,
+            DATE_FORMAT(wb.batch_date, '%Y-%m-%d') as batchDate,
+            CASE wb.state
+                WHEN 1 THEN '新建'
+                WHEN 2 THEN '待确认'
+                WHEN 3 THEN '已确认'
+                WHEN 4 THEN '已下架'
+                ELSE '未知'
+                END as state
+        FROM whol_batch wb
+                 LEFT JOIN node_info ni ON wb.whol_id = ni.node_id
+                 LEFT JOIN province p ON ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON ni.city_id = c.city_id
+                 LEFT JOIN slau_batch sb ON wb.sb_id = sb.sb_id
+        WHERE wb.wb_id = #{wbId}
+    </select>
+
+    <select id="selectWholBatchByState" resultType="com.gala.farmsearchbackend.model.dto.wholDto.WholStateDto">
+        SELECT
+        wb.wb_id as wbId,
+        wb.batch_id as batchId,
+        wb.type,
+        wb.batch_date as batchDate,
+        wb.state,
+        CASE
+        WHEN wb.state = 2 OR wb.state = 3 THEN sb.batch_id  <!-- 待确认和已确认状态都查询进场批号 -->
+        ELSE null
+        END as sbBatchId
+        FROM whol_batch wb
+        LEFT JOIN slau_batch sb ON wb.sb_id = sb.sb_id
+        WHERE wb.whol_id = #{queryDto.wholId}
+        AND wb.state != 4  <!-- 排除已下架状态 -->
+        <if test="queryDto.state != null">
+            AND wb.state = #{queryDto.state}
+        </if>
+        ORDER BY wb.batch_date DESC
+    </select>
+
+    <select id="selectPendingWholBatchByWholNameWithNode" resultType="com.gala.farmsearchbackend.model.dto.wholDto.WholNameDto">
+        SELECT
+        wb.wb_id as wbId,
+        ni.name as nodeName,
+        wb.batch_id as batchId,
+        wb.type,
+        sb.batch_id as sbBatchId,  <!-- 待确认状态一定显示进场批号 -->
+        wb.batch_date as batchDate,
+        wb.state
+        FROM whol_batch wb
+        INNER JOIN node_info ni ON wb.whol_id = ni.node_id
+        LEFT JOIN slau_batch sb ON wb.sb_id = sb.sb_id
+        WHERE wb.state = 2  <!-- 只查询待确认状态 -->
+        <if test="wholName != null and wholName != ''">
+            AND ni.name LIKE CONCAT('%', #{wholName}, '%')
+        </if>
+        ORDER BY wb.batch_date DESC
+    </select>
+
+    <select id="selectDownstreamRetailerNames" resultType="java.lang.String">
+        SELECT DISTINCT ni.name
+        FROM reta_batch rb
+                 INNER JOIN node_info ni ON rb.reta_id = ni.node_id
+        WHERE rb.wb_id IN (
+            SELECT wb_id FROM whol_batch WHERE whol_id = #{wholId}
+        )
+          AND ni.status = 0
+    </select>
+</mapper>

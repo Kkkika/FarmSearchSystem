@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gala.farmsearchbackend.mapper.SlauBatchMapper">
+
+    <resultMap id="BaseResultMap" type="com.gala.farmsearchbackend.model.domain.SlauBatch">
+        <id property="sbId" column="sb_id" jdbcType="INTEGER"/>
+        <result property="batchId" column="batch_id" jdbcType="VARCHAR"/>
+        <result property="slauId" column="slau_id" jdbcType="INTEGER"/>
+        <result property="fbId" column="fb_id" jdbcType="INTEGER"/>
+        <result property="type" column="type" jdbcType="VARCHAR"/>
+        <result property="quaId" column="qua_id" jdbcType="VARCHAR"/>
+        <result property="testName" column="test_name" jdbcType="VARCHAR"/>
+        <result property="batchDate" column="batch_date" jdbcType="DATE"/>
+        <result property="state" column="state" jdbcType="INTEGER"/>
+        <result property="remarks" column="remarks" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        sb_id, batch_id, slau_id, fb_id, type, qua_id, test_name, batch_date, state, remarks
+    </sql>
+
+    <update id="updateSlauBatchState">
+        UPDATE slau_batch
+        SET state = #{state} , remarks = #{remarks}
+        WHERE sb_id = #{sbId}
+    </update>
+
+    <!-- 根据屠宰产品批号ID查询详情 -->
+    <select id="selectSlauBatchDetailById" parameterType="java.lang.Integer" resultType="com.gala.farmsearchbackend.model.dto.slauDto.SlauBatchDetailDto">
+        SELECT
+            sb.batch_id,
+            p.prov_name as farm_province,
+            c.city_name as farm_city,
+            farm_ni.name as farm_name,
+            fb.batch_id as farm_batch_id,
+            fb.type as farm_product_type,
+            sb.qua_id,
+            sb.test_name,
+            sb.type
+        FROM slau_batch sb
+                 LEFT JOIN farm_batch fb ON sb.fb_id = fb.fb_id
+                 LEFT JOIN node_info farm_ni ON fb.farm_id = farm_ni.node_id
+                 LEFT JOIN province p ON farm_ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON farm_ni.city_id = c.city_id
+        WHERE sb.sb_id = #{sbId}
+    </select>
+
+    <select id="selectSlauDetailById" resultType="com.gala.farmsearchbackend.model.dto.slauDto.SlauDetailsDto">
+        SELECT
+            sb.batch_id,
+            ni.name as nodeName,
+            p.prov_name as nodeProvince,
+            c.city_name as nodeCity,
+            fb.batch_id as farmBatchId,
+            sb.qua_id,
+            sb.test_name,
+            sb.type,
+            DATE_FORMAT(sb.batch_date, '%Y-%m-%d') as batchDate,
+            CASE sb.state
+                WHEN 1 THEN '新建'
+                WHEN 2 THEN '待确认'
+                WHEN 3 THEN '已确认'
+                WHEN 4 THEN '已下架'
+                ELSE '未知'
+                END as state
+        FROM slau_batch sb
+                 LEFT JOIN node_info ni ON sb.slau_id = ni.node_id
+                 LEFT JOIN province p ON ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON ni.city_id = c.city_id
+                 LEFT JOIN farm_batch fb ON sb.fb_id = fb.fb_id
+        WHERE sb.sb_id = #{sbId}
+    </select>
+
+    <select id="selectSlauBatchByState" resultType="com.gala.farmsearchbackend.model.dto.slauDto.SlauStateDto">
+        SELECT
+        sb.sb_id as sbId,
+        sb.batch_id as batchId,
+        sb.type,
+        sb.batch_date as batchDate,
+        sb.state,
+        CASE
+        WHEN sb.state = 2 OR sb.state = 3 THEN fb.batch_id  <!-- 待确认和已确认状态都查询进场批号 -->
+        ELSE null
+        END as fbBatchId
+        FROM slau_batch sb
+        LEFT JOIN farm_batch fb ON sb.fb_id = fb.fb_id
+        WHERE sb.slau_id = #{queryDto.slauId}
+        AND sb.state != 4  <!-- 排除已下架状态 -->
+        <if test="queryDto.state != null">
+            AND sb.state = #{queryDto.state}
+        </if>
+        ORDER BY sb.batch_date DESC
+    </select>
+
+    <select id="selectPendingSlauBatchBySlauNameWithNode" resultType="com.gala.farmsearchbackend.model.dto.slauDto.SlauNameDto">
+        SELECT
+        sb.sb_id as sbId,
+        ni.name as nodeName,
+        sb.batch_id as batchId,
+        sb.type,
+        fb.batch_id as fbBatchId,  <!-- 待确认状态一定显示进场批号 -->
+        sb.batch_date as batchDate,
+        sb.state
+        FROM slau_batch sb
+        INNER JOIN node_info ni ON sb.slau_id = ni.node_id
+        LEFT JOIN farm_batch fb ON sb.fb_id = fb.fb_id
+        WHERE sb.state = 2  <!-- 只查询待确认状态 -->
+        <if test="slauName != null and slauName != ''">
+            AND ni.name LIKE CONCAT('%', #{slauName}, '%')
+        </if>
+        ORDER BY sb.batch_date DESC
+    </select>
+
+    <select id="selectDownstreamWholesalerNames" resultType="java.lang.String">
+        SELECT DISTINCT ni.name
+        FROM whol_batch wb
+                 INNER JOIN node_info ni ON wb.whol_id = ni.node_id
+        WHERE wb.sb_id IN (
+            SELECT sb_id FROM slau_batch WHERE slau_id = #{slauId}
+        )
+          AND ni.status = 0
+    </select>
+</mapper>

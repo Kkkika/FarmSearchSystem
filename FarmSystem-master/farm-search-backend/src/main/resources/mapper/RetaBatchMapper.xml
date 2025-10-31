@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gala.farmsearchbackend.mapper.RetaBatchMapper">
+
+    <resultMap id="BaseResultMap" type="com.gala.farmsearchbackend.model.domain.RetaBatch">
+        <id property="rbId" column="rb_id" jdbcType="INTEGER"/>
+        <result property="batchId" column="batch_id" jdbcType="VARCHAR"/>
+        <result property="retaId" column="reta_id" jdbcType="INTEGER"/>
+        <result property="wbId" column="wb_id" jdbcType="INTEGER"/>
+        <result property="type" column="type" jdbcType="VARCHAR"/>
+        <result property="batchDate" column="batch_date" jdbcType="DATE"/>
+        <result property="sourceId" column="source_id" jdbcType="VARCHAR"/>
+        <result property="sourceQr" column="source_qr" jdbcType="VARCHAR"/>
+        <result property="state" column="state" jdbcType="INTEGER"/>
+        <result property="remarks" column="remarks" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        rb_id, batch_id, reta_id, wb_id, type, batch_date, source_id, source_qr, state, remarks
+    </sql>
+
+    <!-- 更新零售商产品批号状态 -->
+    <update id="updateRetaBatchState">
+        UPDATE reta_batch
+        SET state = #{state}, remarks = #{remarks}
+        WHERE rb_id = #{rbId}
+    </update>
+
+    <!-- 根据零售商产品批号ID查询详情 -->
+    <select id="selectRetaBatchDetailById" parameterType="java.lang.Integer" resultType="com.gala.farmsearchbackend.model.dto.retaDto.RetaBatchDetailDto">
+        SELECT
+            rb.batch_id,
+            p.prov_name as whol_province,
+            c.city_name as whol_city,
+            whol_ni.name as whol_name,
+            wb.batch_id as whol_batch_id,
+            wb.type as whol_product_type,
+            rb.type
+        FROM reta_batch rb
+                 LEFT JOIN whol_batch wb ON rb.wb_id = wb.wb_id
+                 LEFT JOIN node_info whol_ni ON wb.whol_id = whol_ni.node_id
+                 LEFT JOIN province p ON whol_ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON whol_ni.city_id = c.city_id
+        WHERE rb.rb_id = #{rbId}
+    </select>
+
+    <select id="selectRetaDetailById" resultType="com.gala.farmsearchbackend.model.dto.retaDto.RetaDetailsDto">
+        SELECT
+            rb.batch_id,
+            wb.batch_id as wholBatchId,
+            ni.name as nodeName,
+            p.prov_name as nodeProvince,
+            c.city_name as nodeCity,
+            rb.type,
+            DATE_FORMAT(rb.batch_date, '%Y-%m-%d') as batchDate,
+            CASE rb.state
+                WHEN 1 THEN '新建'
+                WHEN 2 THEN '待确认'
+                WHEN 3 THEN '已确认'
+                WHEN 4 THEN '已下架'
+                ELSE '未知'
+                END as state
+        FROM reta_batch rb
+                 LEFT JOIN node_info ni ON rb.reta_id = ni.node_id
+                 LEFT JOIN province p ON ni.prov_id = p.prov_id
+                 LEFT JOIN city c ON ni.city_id = c.city_id
+                 LEFT JOIN whol_batch wb ON rb.wb_id = wb.wb_id
+        WHERE rb.rb_id = #{rbId}
+    </select>
+
+    <select id="selectRetaBatchByState" resultType="com.gala.farmsearchbackend.model.dto.retaDto.RetaStateDto">
+        SELECT
+        rb.rb_id as rbId,
+        rb.batch_id as batchId,
+        rb.type,
+        rb.batch_date as batchDate,
+        rb.state,
+        CASE
+        WHEN rb.state = 2 OR rb.state = 3 THEN wb.batch_id  <!-- 待确认和已确认状态都查询进场批号 -->
+        ELSE null
+        END as wbBatchId
+        FROM reta_batch rb
+        LEFT JOIN whol_batch wb ON rb.wb_id = wb.wb_id
+        WHERE rb.reta_id = #{queryDto.retaId}
+        AND rb.state != 4  <!-- 排除已下架状态 -->
+        <if test="queryDto.state != null">
+            AND rb.state = #{queryDto.state}
+        </if>
+        ORDER BY rb.batch_date DESC
+    </select>
+
+    <select id="selectPendingRetaBatchByRetaNameWithNode" resultType="com.gala.farmsearchbackend.model.dto.retaDto.RetaNameDto">
+        SELECT
+        rb.rb_id as rbId,
+        ni.name as nodeName,
+        rb.batch_id as batchId,
+        rb.type,
+        wb.batch_id as wbBatchId,  <!-- 待确认状态一定显示进场批号 -->
+        rb.batch_date as batchDate,
+        rb.state
+        FROM reta_batch rb
+        INNER JOIN node_info ni ON rb.reta_id = ni.node_id
+        LEFT JOIN whol_batch wb ON rb.wb_id = wb.wb_id
+        WHERE rb.state = 2  <!-- 只查询待确认状态 -->
+        <if test="retaName != null and retaName != ''">
+            AND ni.name LIKE CONCAT('%', #{retaName}, '%')
+        </if>
+        ORDER BY rb.batch_date DESC
+    </select>
+</mapper>
